@@ -17,13 +17,20 @@ npx serve .
 
 ## Deploy it (GitHub Pages)
 
+This file is also copied to `docs/index.html` at the repo root, which gives the
+shortest possible Pages URL. To publish:
+
 1. Push the repo to GitHub.
 2. **Settings → Pages → Build and deployment → Source: Deploy from a branch**,
-   pick `main` and `/ (root)` (or `/docs`).
-3. The demo will be live at
-   `https://rahul1368.github.io/yieldagent/examples/demo/`.
+   pick branch `main` and folder **`/docs`**, then Save.
+3. In ~1 minute the demo is live at `https://rahul1368.github.io/yieldagent/`.
 
-(For a shorter URL, copy `index.html` to a `docs/` folder and serve that.)
+If you edit this `examples/demo/index.html`, copy it over so the published
+version stays in sync:
+
+```bash
+cp examples/demo/index.html docs/index.html
+```
 
 ## Record the GIF for the README
 

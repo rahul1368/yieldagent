@@ -22,7 +22,7 @@ sensitive — here, sending an email:
 <!-- Record examples/demo/index.html and drop the GIF here. See examples/demo/README.md -->
 <!-- ![human-in-the-loop demo](examples/demo/demo.gif) -->
 
-▶ **[Try the live demo](https://rahul1368.github.io/yieldagent/examples/demo/)** — runs in your browser, no API key. (Source: [`examples/demo`](examples/demo).)
+▶ **[Try the live demo](https://rahul1368.github.io/yieldagent/)** — runs in your browser, no API key. (Source: [`examples/demo`](examples/demo).)
 
 ## Why
 
