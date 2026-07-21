@@ -1,5 +1,5 @@
 /**
- * yieldagent — a small agent loop with no dependencies.
+ * yieldagent, a small agent loop with no dependencies.
  *
  * The loop is an async generator: it yields every step so you can inspect and
  * test it, and it can pause before a tool runs (see `approve`) so a human can
@@ -18,7 +18,7 @@ export interface Tool<Args = unknown, Result = unknown> {
 
 /**
  * A collection of tools keyed by name, as passed to the agent. The `never`
- * argument type lets tools with any specific `Args` be stored together — the
+ * argument type lets tools with any specific `Args` be stored together, the
  * model supplies the arguments, so they're validated at the tool boundary.
  */
 export type ToolSet = Record<string, Tool<never, unknown>>;
@@ -55,7 +55,7 @@ export interface ModelCallOptions {
 /**
  * Your model call. Given the running conversation and the tool specs, return
  * the assistant's next message (optionally containing `tool_calls`). The third
- * argument is optional — forward `options.signal` to your request if you want
+ * argument is optional, forward `options.signal` to your request if you want
  * in-flight calls to cancel. See `yieldagent/openai` for a ready-made adapter.
  */
 export type ModelCall = (
@@ -84,7 +84,7 @@ export type ModelStreamCall = (
 ) => AsyncIterable<StreamChunk>;
 
 /**
- * Define a tool with a typed `run`. Purely a typing convenience — it returns
+ * Define a tool with a typed `run`. Purely a typing convenience, it returns
  * its argument unchanged, but lets you write `tool<{ city: string }>({ ... })`
  * so `run`'s parameter is checked instead of `unknown`.
  */
@@ -145,7 +145,7 @@ export interface AgentConfig {
   /**
    * Cancel the run. When aborted, the loop throws at the next checkpoint (before
    * a model call or a tool run) and forwards the signal to the model call.
-   * Cancelling is not the same as pausing — it stops without a resumeState.
+   * Cancelling is not the same as pausing, it stops without a resumeState.
    */
   signal?: AbortSignal;
 }
@@ -189,7 +189,7 @@ async function* consumeStream(
 }
 
 /**
- * Run an agent as an async generator of steps. You drive it — iterate with
+ * Run an agent as an async generator of steps. You drive it, iterate with
  * `for await`, inspect every step, and stop whenever you like.
  *
  * @example

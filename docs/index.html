@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>yieldagent — human-in-the-loop demo</title>
+    <title>yieldagent: human-in-the-loop demo</title>
     <style>
       :root {
         --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #e6edf3;
@@ -70,8 +70,8 @@
   </head>
   <body>
     <div class="app">
-      <h1><code>yieldagent</code> — human in the loop</h1>
-      <p class="sub">The agent runs on its own, but pauses for your approval before doing anything sensitive. Everything below runs in your browser with a simulated model — no API key.</p>
+      <h1><code>yieldagent</code>: human in the loop</h1>
+      <p class="sub">The agent runs on its own, but pauses for your approval before doing anything sensitive. Everything below runs in your browser with a simulated model, no API key.</p>
 
       <div class="prompt"><b>user:</b> Email the Delhi weather to my boss.</div>
       <div class="log" id="log"></div>
@@ -113,11 +113,11 @@
         row("", "result", "{ city: \"Delhi\", tempC: 31, sky: \"clear\" }");
         await sleep(500);
 
-        // The agent wants to send an email — pause for approval.
+        // The agent wants to send an email, pause for approval.
         const pause = row("pause", "paused", "");
         pause.querySelector("div").innerHTML = `
           <div class="approve">
-            <div class="q">The agent wants to run <b>sendEmail</b> — approve?</div>
+            <div class="q">The agent wants to run <b>sendEmail</b>, approve?</div>
             <div class="args">to: "boss@acme.com", body: "Delhi is 31°C and clear."</div>
             <div class="btns">
               <button class="primary" id="ok">Approve</button>
@@ -145,7 +145,7 @@
         row("tool", "tool", "<b>sendEmail</b> → { sent: true }");
         await sleep(500);
         const final = row("final", "final", "");
-        await typeInto(final.querySelector("div"), "Done — I've emailed the Delhi weather (31°C, clear) to your boss.");
+        await typeInto(final.querySelector("div"), "Done, I've emailed the Delhi weather (31°C, clear) to your boss.");
 
         runBtn.disabled = false;
         runBtn.textContent = "▶ Run again";

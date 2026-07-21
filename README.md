@@ -7,7 +7,7 @@
 [![license](https://img.shields.io/npm/l/yieldagent.svg)](./LICENSE)
 
 A small agent loop you can actually read. No dependencies, works with any
-OpenAI-compatible API, and — unlike most minimal agent libraries — it lets you
+OpenAI-compatible API. Unlike most minimal agent libraries, it also lets you
 pause before a tool runs, get a human's approval, and resume later.
 
 ```bash
@@ -17,18 +17,18 @@ npm install yieldagent
 ## Demo
 
 The agent runs on its own but stops for your approval before doing anything
-sensitive — here, sending an email:
+sensitive, here, sending an email:
 
 <!-- Record examples/demo/index.html and drop the GIF here. See examples/demo/README.md -->
 <!-- ![human-in-the-loop demo](examples/demo/demo.gif) -->
 
-▶ **[Try the live demo](https://rahul1368.github.io/yieldagent/)** — runs in your browser, no API key. (Source: [`examples/demo`](examples/demo).)
+▶ **[Try the live demo](https://rahul1368.github.io/yieldagent/)**, runs in your browser, no API key. (Source: [`examples/demo`](examples/demo).)
 
 ## Why
 
 I wanted an agent loop I could understand end to end instead of a framework I
 had to configure. The tiny ones I found were fine until I needed the agent to
-do something I didn't want it doing unsupervised — sending an email, spending
+do something I didn't want it doing unsupervised, sending an email, spending
 money, deleting a file. None of them made "stop and ask a human first" easy,
 and the big frameworks made it a whole subsystem.
 
@@ -91,7 +91,7 @@ for await (const step of agent(cfg)) {
 
 `resumeState` is serializable, so you can write it to a database or a job queue,
 wait for a human to click approve (in another request, another process, after a
-restart — doesn't matter), then continue:
+restart, doesn't matter), then continue:
 
 ```ts
 import { resume } from "yieldagent";
@@ -104,7 +104,7 @@ for await (const step of resume(cfg, paused)) {
 ## Streaming
 
 Pass `stream` instead of `call` to stream tokens as the model produces them. The
-loop emits `token` steps as text arrives and otherwise behaves identically —
+loop emits `token` steps as text arrives and otherwise behaves identically -
 tools, pause/resume, and cancellation all still work.
 
 ```ts
@@ -124,7 +124,7 @@ call tools mid-stream.
 
 ## Cancelling a run
 
-Pass an `AbortSignal` to stop a run — on a timeout, a user cancel, or a request
+Pass an `AbortSignal` to stop a run, on a timeout, a user cancel, or a request
 teardown. The loop throws at the next checkpoint (before a model call or a tool
 runs) and forwards the signal to the model call, so an in-flight request is
 aborted too. Cancelling isn't pausing: it stops without a `resumeState`.
@@ -146,7 +146,7 @@ try {
 ## Typed tools
 
 Tool args default to `any`. Wrap a definition in `tool<Args>()` to type `run`'s
-parameter — it's just a pass-through for the types, no runtime cost:
+parameter, it's just a pass-through for the types, no runtime cost:
 
 ```ts
 import { tool } from "yieldagent";
@@ -174,7 +174,7 @@ const getWeather = zodTool({
 });
 ```
 
-Zod is a peer dependency — install it yourself (`npm install zod`).
+Zod is a peer dependency, install it yourself (`npm install zod`).
 
 ## Testing without an LLM
 
@@ -195,31 +195,31 @@ for await (const s of agent({ call, tools, messages })) steps.push(s);
 // assert on steps.map(s => s.type), the tool results, the final text, etc.
 ```
 
-This is how the library tests itself — see [`test/agent.test.ts`](test/agent.test.ts).
+This is how the library tests itself, see [`test/agent.test.ts`](test/agent.test.ts).
 
 ## API
 
 **`agent(config)`** returns an async generator of steps.
 
-- `call` — your model function, `(messages, tools, options?) => Promise<Message>`
-- `tools` — a map of name → `{ description, parameters, run }`
-- `messages` — the conversation so far
-- `maxSteps` — cap on model round-trips (default 10)
-- `approve` — optional `(tool, args) => boolean`; return `false` to pause
-- `signal` — optional `AbortSignal` to cancel the run
+- `call`, your model function, `(messages, tools, options?) => Promise<Message>`
+- `tools`, a map of name → `{ description, parameters, run }`
+- `messages`, the conversation so far
+- `maxSteps`, cap on model round-trips (default 10)
+- `approve`, optional `(tool, args) => boolean`; return `false` to pause
+- `signal`, optional `AbortSignal` to cancel the run
 
 **`resume(config, resumeState)`** runs the pending tool from a paused run, then
 continues the loop.
 
 **Step** is one of:
 
-- `tool-start` — `{ tool, args, step }`
-- `tool-end` — `{ tool, args, result?, error?, step }`
-- `paused` — `{ tool, args, resumeState }`
-- `final` — `{ text, messages }`
+- `tool-start`, `{ tool, args, step }`
+- `tool-end`, `{ tool, args, result?, error?, step }`
+- `paused`, `{ tool, args, resumeState }`
+- `final`, `{ text, messages }`
 
 **Providers.** `openaiCompatible` talks to anything speaking the
-`/chat/completions` shape — OpenAI, Anthropic's compatible endpoint, Groq,
+`/chat/completions` shape, OpenAI, Anthropic's compatible endpoint, Groq,
 Together, Ollama, OpenRouter:
 
 ```ts
@@ -230,7 +230,7 @@ openaiCompatible({
 });
 ```
 
-Or skip it and write your own `call` — it's a dozen lines.
+Or skip it and write your own `call`, it's a dozen lines.
 
 ## When to use something else
 

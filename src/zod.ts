@@ -4,7 +4,7 @@
  * arguments the model sends back. Invalid arguments are reported to the model
  * (as a tool error) so it can correct itself instead of your `run` crashing.
  *
- * Zod is a peer dependency — install it yourself: `npm install zod`.
+ * Zod is a peer dependency, install it yourself: `npm install zod`.
  */
 import type { ZodTypeAny, infer as Infer } from "zod";
 import type { Tool } from "./index.js";

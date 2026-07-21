@@ -34,7 +34,7 @@ cp examples/demo/index.html docs/index.html
 
 ## Record the GIF for the README
 
-The pause-and-approve moment is the whole pitch — a short GIF of it belongs at
+The pause-and-approve moment is the whole pitch, a short GIF of it belongs at
 the top of the main README.
 
 1. Open the demo and click **Run the agent**.

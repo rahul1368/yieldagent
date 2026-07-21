@@ -21,8 +21,8 @@ npm run build     # build to dist/
   behind their own entry point with the dependency as an optional peer.
 - **No `any`.** Use `unknown` for data whose shape the model controls, and
   precise types everywhere else.
-- **Tests come with changes.** The suite uses a scripted model — no network, no
-  API key — so please cover new behavior the same way.
+- **Tests come with changes.** The suite uses a scripted model, no network, no
+  API key, so please cover new behavior the same way.
 - **Keep it small.** If a feature needs a lot of surface area, it may belong in a
   separate package rather than the core.
 
