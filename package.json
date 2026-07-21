@@ -1,0 +1,63 @@
+{
+  "name": "yieldagent",
+  "version": "0.1.0",
+  "description": "The smallest agent loop that's actually useful. ~120 lines, zero dependencies, with human-in-the-loop pause/resume built in. Works with any OpenAI-compatible endpoint.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./openai": {
+      "types": "./dist/openai.d.ts",
+      "import": "./dist/openai.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "agent-loop",
+    "llm",
+    "tool-calling",
+    "function-calling",
+    "human-in-the-loop",
+    "resumable",
+    "openai",
+    "anthropic",
+    "zero-dependency",
+    "typescript"
+  ],
+  "author": "Rahul Choudhary <chaudharyrobin199@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rahul1368/yieldagent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rahul1368/yieldagent/issues"
+  },
+  "homepage": "https://github.com/rahul1368/yieldagent#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
