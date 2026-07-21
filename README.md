@@ -85,6 +85,42 @@ for await (const step of resume(cfg, paused)) {
 }
 ```
 
+## Cancelling a run
+
+Pass an `AbortSignal` to stop a run — on a timeout, a user cancel, or a request
+teardown. The loop throws at the next checkpoint (before a model call or a tool
+runs) and forwards the signal to the model call, so an in-flight request is
+aborted too. Cancelling isn't pausing: it stops without a `resumeState`.
+
+```ts
+const ac = new AbortController();
+setTimeout(() => ac.abort(), 10_000); // give up after 10s
+
+try {
+  for await (const step of agent({ call, tools, messages, signal: ac.signal })) {
+    if (step.type === "final") console.log(step.text);
+  }
+} catch (err) {
+  if (ac.signal.aborted) console.log("gave up");
+  else throw err;
+}
+```
+
+## Typed tools
+
+Tool args default to `any`. Wrap a definition in `tool<Args>()` to type `run`'s
+parameter — it's just a pass-through for the types, no runtime cost:
+
+```ts
+import { tool } from "yieldagent";
+
+const getWeather = tool<{ city: string }>({
+  description: "Get the current weather for a city",
+  parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+  run: async ({ city }) => ({ city, tempC: 31 }), // `city` is typed as string
+});
+```
+
 ## Testing without an LLM
 
 `call` is just a function `(messages, tools) => Promise<Message>`. In tests, pass
@@ -110,11 +146,12 @@ This is how the library tests itself — see [`test/agent.test.ts`](test/agent.t
 
 **`agent(config)`** returns an async generator of steps.
 
-- `call` — your model function, `(messages, tools) => Promise<Message>`
+- `call` — your model function, `(messages, tools, options?) => Promise<Message>`
 - `tools` — a map of name → `{ description, parameters, run }`
 - `messages` — the conversation so far
 - `maxSteps` — cap on model round-trips (default 10)
 - `approve` — optional `(tool, args) => boolean`; return `false` to pause
+- `signal` — optional `AbortSignal` to cancel the run
 
 **`resume(config, resumeState)`** runs the pending tool from a paused run, then
 continues the loop.

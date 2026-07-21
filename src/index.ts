@@ -40,15 +40,33 @@ export interface ToolSpec {
   };
 }
 
+/** Extra options passed to a model call, e.g. an abort signal to forward. */
+export interface ModelCallOptions {
+  signal?: AbortSignal;
+}
+
 /**
  * Your model call. Given the running conversation and the tool specs, return
- * the assistant's next message (optionally containing `tool_calls`).
- * Bring your own provider — see `yieldagent/openai` for a ready-made adapter.
+ * the assistant's next message (optionally containing `tool_calls`). The third
+ * argument is optional — forward `options.signal` to your request if you want
+ * in-flight calls to cancel. See `yieldagent/openai` for a ready-made adapter.
  */
 export type ModelCall = (
   messages: Message[],
   tools: ToolSpec[],
+  options?: ModelCallOptions,
 ) => Promise<Message>;
+
+/**
+ * Define a tool with a typed `run`. Purely a typing convenience — it returns
+ * its argument unchanged, but lets you write `tool<{ city: string }>({ ... })`
+ * so `run`'s parameter is checked instead of `any`.
+ */
+export function tool<Args = any, Result = any>(
+  def: Tool<Args, Result>,
+): Tool<Args, Result> {
+  return def;
+}
 
 /** Everything needed to resume a paused run. Plain and serializable. */
 export interface ResumeState {
@@ -92,6 +110,12 @@ export interface AgentConfig {
    * (the loop yields a `paused` step with a serializable `resumeState`).
    */
   approve?: (tool: string, args: any) => boolean;
+  /**
+   * Cancel the run. When aborted, the loop throws at the next checkpoint (before
+   * a model call or a tool run) and forwards the signal to the model call.
+   * Cancelling is not the same as pausing — it stops without a resumeState.
+   */
+  signal?: AbortSignal;
 }
 
 function toSpecs(tools: Record<string, Tool>): ToolSpec[] {
@@ -124,12 +148,13 @@ async function runTool(
 export async function* agent(
   cfg: AgentConfig,
 ): AsyncGenerator<Step, void, unknown> {
-  const { call, tools, maxSteps = 10, approve } = cfg;
+  const { call, tools, maxSteps = 10, approve, signal } = cfg;
   const messages: Message[] = [...cfg.messages];
   const specs = toSpecs(tools);
 
   for (let step = 0; step < maxSteps; step++) {
-    const reply = await call(messages, specs);
+    signal?.throwIfAborted();
+    const reply = await call(messages, specs, { signal });
     messages.push(reply);
 
     // Model answered without asking for a tool -> we're done.
@@ -152,6 +177,8 @@ export async function* agent(
         });
         continue;
       }
+
+      signal?.throwIfAborted();
 
       // Let the caller stop us before the tool actually runs.
       if (approve && approve(name, args) === false) {
@@ -191,12 +218,14 @@ export async function* resume(
   cfg: AgentConfig,
   state: ResumeState,
 ): AsyncGenerator<Step, void, unknown> {
-  const { tools } = cfg;
+  const { tools, signal } = cfg;
   const messages: Message[] = [...state.messages];
   const tc = state.pendingCall;
   const name = tc.function.name;
   const args = parseArgs(tc.function.arguments);
   const tool = tools[name];
+
+  signal?.throwIfAborted();
 
   if (!tool) {
     messages.push({

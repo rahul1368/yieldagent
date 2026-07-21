@@ -5,7 +5,7 @@
  *
  * Bring your own `fetch` if you need a custom one; defaults to global fetch.
  */
-import type { Message, ModelCall, ToolSpec } from "./index.js";
+import type { Message, ModelCall, ModelCallOptions, ToolSpec } from "./index.js";
 
 export interface OpenAICompatibleOptions {
   /** API key (sent as `Authorization: Bearer <key>`). */
@@ -39,7 +39,11 @@ export function openaiCompatible(opts: OpenAICompatibleOptions): ModelCall {
     fetch: fetchImpl = globalThis.fetch,
   } = opts;
 
-  return async function call(messages: Message[], tools: ToolSpec[]): Promise<Message> {
+  return async function call(
+    messages: Message[],
+    tools: ToolSpec[],
+    options?: ModelCallOptions,
+  ): Promise<Message> {
     const res = await fetchImpl(`${baseURL}/chat/completions`, {
       method: "POST",
       headers: {
@@ -52,6 +56,7 @@ export function openaiCompatible(opts: OpenAICompatibleOptions): ModelCall {
         ...(tools.length ? { tools, tool_choice: "auto" } : {}),
         ...(temperature != null ? { temperature } : {}),
       }),
+      signal: options?.signal,
     });
 
     if (!res.ok) {

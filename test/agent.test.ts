@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { agent, resume, type Message, type ModelCall, type Tool } from "../src/index.js";
+import { agent, resume, tool, type Message, type ModelCall, type Tool } from "../src/index.js";
 
 /**
  * A scripted, deterministic model — no API key, no network. This is the whole
@@ -132,5 +132,50 @@ describe("agent", () => {
     const toolStarts = steps.filter((s) => s.type === "tool-start");
     expect(toolStarts).toHaveLength(3);
     expect((steps.at(-1) as any).type).toBe("final");
+  });
+
+  it("throws when the signal is already aborted", async () => {
+    const call = scriptedModel([{ role: "assistant", content: "hi", tool_calls: [] }]);
+    const signal = AbortSignal.abort(new Error("stop"));
+    await expect(async () => {
+      for await (const _ of agent({ call, tools, messages: userMsg, signal })) {
+        /* drain */
+      }
+    }).rejects.toThrow("stop");
+  });
+
+  it("aborts mid-run before the next tool runs", async () => {
+    const controller = new AbortController();
+    const sendEmail = vi.fn(() => ({ sent: true }));
+    const t: Record<string, Tool> = {
+      ...tools,
+      sendEmail: { description: "send", parameters: { type: "object", properties: {} }, run: sendEmail },
+    };
+    // Model wants getWeather, then sendEmail. We abort after the first tool ends.
+    const call = scriptedModel([
+      toolCall("c1", "getWeather", { city: "Delhi" }),
+      toolCall("c2", "sendEmail", {}),
+    ]);
+
+    const seen: string[] = [];
+    await expect(async () => {
+      for await (const s of agent({ call, tools: t, messages: userMsg, signal: controller.signal })) {
+        seen.push(s.type);
+        if (s.type === "tool-end") controller.abort(new Error("cancelled"));
+      }
+    }).rejects.toThrow("cancelled");
+
+    // getWeather ran; sendEmail was never reached.
+    expect(seen).toEqual(["tool-start", "tool-end"]);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("tool() is a typed pass-through", () => {
+    const t = tool<{ city: string }, { tempC: number }>({
+      description: "weather",
+      parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+      run: ({ city }) => ({ tempC: city.length }),
+    });
+    expect(t.run({ city: "Delhi" })).toEqual({ tempC: 5 });
   });
 });
