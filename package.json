@@ -1,6 +1,6 @@
 {
   "name": "yieldagent",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A small, zero-dependency agent loop with human-in-the-loop pause/resume, streaming, and optional Zod tools. Works with any OpenAI-compatible endpoint.",
   "type": "module",
   "main": "./dist/index.js",
