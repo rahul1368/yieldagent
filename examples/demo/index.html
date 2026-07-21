@@ -76,7 +76,10 @@
       <div class="prompt"><b>user:</b> Email the Delhi weather to my boss.</div>
       <div class="log" id="log"></div>
 
-      <div class="run"><button id="run">▶ Run the agent</button></div>
+      <div class="run">
+        <button id="run">▶ Run the agent</button>
+        <button id="jump" style="background:var(--panel);border-color:var(--border);color:var(--muted)">Jump to approval</button>
+      </div>
 
       <footer>
         A simulated demo of <a href="https://github.com/rahul1368/yieldagent">yieldagent</a>.
@@ -87,7 +90,7 @@
     <script>
       const log = document.getElementById("log");
       const runBtn = document.getElementById("run");
-      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      const jumpBtn = document.getElementById("jump");
 
       function row(badgeClass, badgeText, html) {
         const div = document.createElement("div");
@@ -98,20 +101,18 @@
         return div;
       }
 
-      async function typeInto(el, text) {
-        el.classList.add("cursor");
-        for (const ch of text) { el.textContent += ch; await sleep(18); }
-        el.classList.remove("cursor");
-      }
-
-      async function run() {
+      // When `instant` is true, all delays are skipped so the demo jumps
+      // straight to the approval state (handy for a screenshot or to start a
+      // recording at the interesting moment). Also triggered by the #paused URL.
+      async function run(instant) {
+        const wait = (ms) => (instant ? Promise.resolve() : new Promise((r) => setTimeout(r, ms)));
         runBtn.disabled = true;
         log.innerHTML = "";
 
         row("tool", "tool", "<b>getWeather</b>({ city: \"Delhi\" })");
-        await sleep(600);
+        await wait(600);
         row("", "result", "{ city: \"Delhi\", tempC: 31, sky: \"clear\" }");
-        await sleep(500);
+        await wait(500);
 
         // The agent wants to send an email, pause for approval.
         const pause = row("pause", "paused", "");
@@ -134,7 +135,7 @@
           decision ? "<span style='color:var(--green)'>✓ approved</span>"
                    : "<span style='color:var(--red)'>✕ denied</span>";
 
-        await sleep(400);
+        await wait(400);
         if (!decision) {
           row("stop", "stopped", "Email was not sent. The run ended safely.");
           runBtn.disabled = false;
@@ -143,15 +144,27 @@
         }
 
         row("tool", "tool", "<b>sendEmail</b> → { sent: true }");
-        await sleep(500);
+        await wait(500);
         const final = row("final", "final", "");
-        await typeInto(final.querySelector("div"), "Done, I've emailed the Delhi weather (31°C, clear) to your boss.");
+        const done = "Done, I've emailed the Delhi weather (31°C, clear) to your boss.";
+        if (instant) {
+          final.querySelector("div").textContent = done;
+        } else {
+          const el = final.querySelector("div");
+          el.classList.add("cursor");
+          for (const ch of done) { el.textContent += ch; await wait(18); }
+          el.classList.remove("cursor");
+        }
 
         runBtn.disabled = false;
         runBtn.textContent = "▶ Run again";
       }
 
-      runBtn.onclick = run;
+      runBtn.onclick = () => run(false);
+      jumpBtn.onclick = () => run(true);
+
+      // Deep link: open .../#paused to land directly on the approval prompt.
+      if (location.hash === "#paused") run(true);
     </script>
   </body>
 </html>
