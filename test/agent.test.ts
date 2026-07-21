@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { agent, resume, tool, type Message, type ModelCall, type Tool } from "../src/index.js";
+import { agent, resume, tool, type Message, type ModelCall, type ToolSet } from "../src/index.js";
 
 /**
  * A scripted, deterministic model — no API key, no network. This is the whole
@@ -14,7 +14,7 @@ function scriptedModel(replies: Message[]): ModelCall {
   };
 }
 
-const tools: Record<string, Tool> = {
+const tools: ToolSet = {
   getWeather: {
     description: "Get weather for a city",
     parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
@@ -92,7 +92,7 @@ describe("agent", () => {
   });
 
   it("reports tool errors back to the model instead of crashing", async () => {
-    const boom: Record<string, Tool> = {
+    const boom: ToolSet = {
       boom: {
         description: "always throws",
         parameters: { type: "object", properties: {} },
@@ -147,7 +147,7 @@ describe("agent", () => {
   it("aborts mid-run before the next tool runs", async () => {
     const controller = new AbortController();
     const sendEmail = vi.fn(() => ({ sent: true }));
-    const t: Record<string, Tool> = {
+    const t: ToolSet = {
       ...tools,
       sendEmail: { description: "send", parameters: { type: "object", properties: {} }, run: sendEmail },
     };

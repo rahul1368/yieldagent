@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>yieldagent — human-in-the-loop demo</title>
+    <style>
+      :root {
+        --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #e6edf3;
+        --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; --amber: #d29922;
+        --red: #f85149; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #ffffff; --panel: #f6f8fa; --border: #d0d7de; --text: #1f2328;
+          --muted: #656d76; --accent: #0969da; --green: #1a7f37; --amber: #9a6700; --red: #cf222e;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        display: flex; justify-content: center; padding: 2rem 1rem;
+      }
+      .app { width: 100%; max-width: 640px; }
+      h1 { font-size: 1.35rem; margin: 0 0 .25rem; }
+      h1 code { color: var(--accent); }
+      p.sub { color: var(--muted); margin: 0 0 1.25rem; font-size: .9rem; }
+      .prompt {
+        background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+        padding: .8rem 1rem; font-size: .9rem; margin-bottom: 1rem;
+      }
+      .prompt b { color: var(--muted); font-weight: 600; }
+      .log {
+        background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+        min-height: 220px; padding: 1rem; font-family: var(--mono); font-size: .85rem;
+        display: flex; flex-direction: column; gap: .55rem;
+      }
+      .row { display: flex; align-items: flex-start; gap: .6rem; animation: fade .25s ease; }
+      @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+      .badge {
+        flex: none; font-size: .7rem; padding: .1rem .45rem; border-radius: 5px;
+        border: 1px solid var(--border); color: var(--muted); margin-top: .05rem;
+      }
+      .badge.tool { color: var(--accent); border-color: var(--accent); }
+      .badge.pause { color: var(--amber); border-color: var(--amber); }
+      .badge.final { color: var(--green); border-color: var(--green); }
+      .badge.stop { color: var(--red); border-color: var(--red); }
+      .approve {
+        margin-top: .4rem; background: var(--bg); border: 1px solid var(--amber);
+        border-radius: 8px; padding: .75rem; display: flex; flex-direction: column; gap: .6rem;
+      }
+      .approve .q { font-size: .85rem; }
+      .approve .args { color: var(--muted); font-size: .78rem; }
+      .btns { display: flex; gap: .5rem; }
+      button {
+        font: inherit; font-size: .82rem; border-radius: 7px; padding: .4rem .9rem;
+        border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer;
+      }
+      button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+      button.danger { color: var(--red); border-color: var(--red); }
+      button:disabled { opacity: .5; cursor: default; }
+      .run { margin-top: 1rem; }
+      .run button { background: var(--accent); border-color: var(--accent); color: #fff; padding: .5rem 1.1rem; }
+      .cursor::after { content: "▋"; color: var(--muted); animation: blink 1s steps(1) infinite; }
+      @keyframes blink { 50% { opacity: 0; } }
+      footer { margin-top: 1.25rem; color: var(--muted); font-size: .8rem; text-align: center; }
+      footer a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <h1><code>yieldagent</code> — human in the loop</h1>
+      <p class="sub">The agent runs on its own, but pauses for your approval before doing anything sensitive. Everything below runs in your browser with a simulated model — no API key.</p>
+
+      <div class="prompt"><b>user:</b> Email the Delhi weather to my boss.</div>
+      <div class="log" id="log"></div>
+
+      <div class="run"><button id="run">▶ Run the agent</button></div>
+
+      <footer>
+        A simulated demo of <a href="https://github.com/rahul1368/yieldagent">yieldagent</a>.
+        In real code the same flow is a <code>for await</code> loop with an <code>approve()</code> callback.
+      </footer>
+    </div>
+
+    <script>
+      const log = document.getElementById("log");
+      const runBtn = document.getElementById("run");
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      function row(badgeClass, badgeText, html) {
+        const div = document.createElement("div");
+        div.className = "row";
+        div.innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span><div>${html}</div>`;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+        return div;
+      }
+
+      async function typeInto(el, text) {
+        el.classList.add("cursor");
+        for (const ch of text) { el.textContent += ch; await sleep(18); }
+        el.classList.remove("cursor");
+      }
+
+      async function run() {
+        runBtn.disabled = true;
+        log.innerHTML = "";
+
+        row("tool", "tool", "<b>getWeather</b>({ city: \"Delhi\" })");
+        await sleep(600);
+        row("", "result", "{ city: \"Delhi\", tempC: 31, sky: \"clear\" }");
+        await sleep(500);
+
+        // The agent wants to send an email — pause for approval.
+        const pause = row("pause", "paused", "");
+        pause.querySelector("div").innerHTML = `
+          <div class="approve">
+            <div class="q">The agent wants to run <b>sendEmail</b> — approve?</div>
+            <div class="args">to: "boss@acme.com", body: "Delhi is 31°C and clear."</div>
+            <div class="btns">
+              <button class="primary" id="ok">Approve</button>
+              <button class="danger" id="no">Deny</button>
+            </div>
+          </div>`;
+        log.scrollTop = log.scrollHeight;
+
+        const decision = await new Promise((resolve) => {
+          pause.querySelector("#ok").onclick = () => resolve(true);
+          pause.querySelector("#no").onclick = () => resolve(false);
+        });
+        pause.querySelector(".btns").innerHTML =
+          decision ? "<span style='color:var(--green)'>✓ approved</span>"
+                   : "<span style='color:var(--red)'>✕ denied</span>";
+
+        await sleep(400);
+        if (!decision) {
+          row("stop", "stopped", "Email was not sent. The run ended safely.");
+          runBtn.disabled = false;
+          runBtn.textContent = "▶ Run again";
+          return;
+        }
+
+        row("tool", "tool", "<b>sendEmail</b> → { sent: true }");
+        await sleep(500);
+        const final = row("final", "final", "");
+        await typeInto(final.querySelector("div"), "Done — I've emailed the Delhi weather (31°C, clear) to your boss.");
+
+        runBtn.disabled = false;
+        runBtn.textContent = "▶ Run again";
+      }
+
+      runBtn.onclick = run;
+    </script>
+  </body>
+</html>

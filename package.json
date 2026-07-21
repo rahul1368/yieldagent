@@ -1,7 +1,7 @@
 {
   "name": "yieldagent",
   "version": "0.2.0",
-  "description": "The smallest agent loop that's actually useful. ~120 lines, zero dependencies, with human-in-the-loop pause/resume built in. Works with any OpenAI-compatible endpoint.",
+  "description": "A small, zero-dependency agent loop with human-in-the-loop pause/resume, streaming, and optional Zod tools. Works with any OpenAI-compatible endpoint.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -14,6 +14,10 @@
     "./openai": {
       "types": "./dist/openai.d.ts",
       "import": "./dist/openai.js"
+    },
+    "./zod": {
+      "types": "./dist/zod.d.ts",
+      "import": "./dist/zod.js"
     }
   },
   "files": [
@@ -54,10 +58,19 @@
   "engines": {
     "node": ">=18"
   },
+  "peerDependencies": {
+    "zod": "^3.23.0 || ^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "zod": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^22.20.1",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "zod": "^3.25.76"
   }
 }

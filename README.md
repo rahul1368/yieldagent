@@ -1,5 +1,11 @@
 # yieldagent
 
+[![npm](https://img.shields.io/npm/v/yieldagent.svg)](https://www.npmjs.com/package/yieldagent)
+[![CI](https://github.com/rahul1368/yieldagent/actions/workflows/ci.yml/badge.svg)](https://github.com/rahul1368/yieldagent/actions/workflows/ci.yml)
+[![minzip](https://img.shields.io/bundlephobia/minzip/yieldagent)](https://bundlephobia.com/package/yieldagent)
+[![types](https://img.shields.io/npm/types/yieldagent.svg)](https://www.npmjs.com/package/yieldagent)
+[![license](https://img.shields.io/npm/l/yieldagent.svg)](./LICENSE)
+
 A small agent loop you can actually read. No dependencies, works with any
 OpenAI-compatible API, and — unlike most minimal agent libraries — it lets you
 pause before a tool runs, get a human's approval, and resume later.
@@ -7,6 +13,16 @@ pause before a tool runs, get a human's approval, and resume later.
 ```bash
 npm install yieldagent
 ```
+
+## Demo
+
+The agent runs on its own but stops for your approval before doing anything
+sensitive — here, sending an email:
+
+<!-- Record examples/demo/index.html and drop the GIF here. See examples/demo/README.md -->
+<!-- ![human-in-the-loop demo](examples/demo/demo.gif) -->
+
+▶ **[Try the live demo](https://rahul1368.github.io/yieldagent/examples/demo/)** — runs in your browser, no API key. (Source: [`examples/demo`](examples/demo).)
 
 ## Why
 
@@ -85,6 +101,27 @@ for await (const step of resume(cfg, paused)) {
 }
 ```
 
+## Streaming
+
+Pass `stream` instead of `call` to stream tokens as the model produces them. The
+loop emits `token` steps as text arrives and otherwise behaves identically —
+tools, pause/resume, and cancellation all still work.
+
+```ts
+import { agent } from "yieldagent";
+import { openaiCompatibleStream } from "yieldagent/openai";
+
+const stream = openaiCompatibleStream({ apiKey: process.env.OPENAI_API_KEY!, model: "gpt-4o-mini" });
+
+for await (const step of agent({ stream, tools, messages })) {
+  if (step.type === "token") process.stdout.write(step.text);
+  if (step.type === "final") console.log();
+}
+```
+
+The adapter assembles streamed tool-call deltas for you, so the model can still
+call tools mid-stream.
+
 ## Cancelling a run
 
 Pass an `AbortSignal` to stop a run — on a timeout, a user cancel, or a request
@@ -120,6 +157,24 @@ const getWeather = tool<{ city: string }>({
   run: async ({ city }) => ({ city, tempC: 31 }), // `city` is typed as string
 });
 ```
+
+If you use [Zod](https://zod.dev), the optional `yieldagent/zod` entry derives the
+JSON Schema *and* validates the model's arguments for you. When the model sends
+bad arguments, the validation error is handed back to it as a tool error, so it
+can correct itself instead of your `run` throwing:
+
+```ts
+import { z } from "zod";
+import { zodTool } from "yieldagent/zod";
+
+const getWeather = zodTool({
+  description: "Get the current weather for a city",
+  schema: z.object({ city: z.string() }),
+  run: async ({ city }) => ({ city, tempC: 31 }), // `city` is typed and validated
+});
+```
+
+Zod is a peer dependency — install it yourself (`npm install zod`).
 
 ## Testing without an LLM
 

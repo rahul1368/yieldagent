@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/openai.ts"],
+  entry: ["src/index.ts", "src/openai.ts", "src/zod.ts"],
   format: ["esm"],
   dts: true,
   clean: true,

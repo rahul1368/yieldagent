@@ -2,10 +2,10 @@
  * Real usage against a live model. Run with:
  *   OPENAI_API_KEY=sk-... npx tsx examples/basic.ts
  */
-import { agent, resume, type Tool, type ResumeState } from "../src/index.js";
+import { agent, resume, type ToolSet, type ResumeState } from "../src/index.js";
 import { openaiCompatible } from "../src/openai.js";
 
-const tools: Record<string, Tool> = {
+const tools: ToolSet = {
   getWeather: {
     description: "Get the current weather for a city",
     parameters: {

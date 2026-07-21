@@ -7,7 +7,7 @@
  */
 
 /** A single tool the agent is allowed to call. */
-export interface Tool<Args = any, Result = any> {
+export interface Tool<Args = unknown, Result = unknown> {
   /** Human-readable description the model uses to decide when to call it. */
   description: string;
   /** JSON Schema describing the tool's arguments object. */
@@ -15,6 +15,13 @@ export interface Tool<Args = any, Result = any> {
   /** The implementation. May be async. Throwing is caught and reported to the model. */
   run: (args: Args) => Result | Promise<Result>;
 }
+
+/**
+ * A collection of tools keyed by name, as passed to the agent. The `never`
+ * argument type lets tools with any specific `Args` be stored together — the
+ * model supplies the arguments, so they're validated at the tool boundary.
+ */
+export type ToolSet = Record<string, Tool<never, unknown>>;
 
 /** A chat message in the OpenAI-compatible shape. */
 export interface Message {
@@ -58,11 +65,30 @@ export type ModelCall = (
 ) => Promise<Message>;
 
 /**
+ * A chunk from a streaming model call: either a piece of text as it arrives,
+ * or the final assembled message (with any tool calls) once the turn is done.
+ */
+export type StreamChunk =
+  | { type: "token"; text: string }
+  | { type: "message"; message: Message };
+
+/**
+ * A streaming model call. Yields `token` chunks as text arrives and must end
+ * with exactly one `message` chunk carrying the complete assistant message.
+ * See `openaiCompatibleStream` in `yieldagent/openai`.
+ */
+export type ModelStreamCall = (
+  messages: Message[],
+  tools: ToolSpec[],
+  options?: ModelCallOptions,
+) => AsyncIterable<StreamChunk>;
+
+/**
  * Define a tool with a typed `run`. Purely a typing convenience — it returns
  * its argument unchanged, but lets you write `tool<{ city: string }>({ ... })`
- * so `run`'s parameter is checked instead of `any`.
+ * so `run`'s parameter is checked instead of `unknown`.
  */
-export function tool<Args = any, Result = any>(
+export function tool<Args = unknown, Result = unknown>(
   def: Tool<Args, Result>,
 ): Tool<Args, Result> {
   return def;
@@ -76,12 +102,13 @@ export interface ResumeState {
 
 /** A single observable step emitted by the loop. */
 export type Step =
-  | { type: "tool-start"; tool: string; args: any; step: number; resumed?: boolean }
+  | { type: "token"; text: string; step: number }
+  | { type: "tool-start"; tool: string; args: unknown; step: number; resumed?: boolean }
   | {
       type: "tool-end";
       tool: string;
-      args: any;
-      result?: any;
+      args: unknown;
+      result?: unknown;
       error?: string;
       step: number;
       resumed?: boolean;
@@ -90,17 +117,22 @@ export type Step =
       type: "paused";
       reason: "approval-required";
       tool: string;
-      args: any;
+      args: unknown;
       resumeState: ResumeState;
     }
   | { type: "final"; text: string | null; messages: Message[] };
 
 /** Configuration for an agent run. */
 export interface AgentConfig {
-  /** Your model call (bring your own provider). */
-  call: ModelCall;
+  /** Your model call (bring your own provider). Required unless `stream` is set. */
+  call?: ModelCall;
+  /**
+   * A streaming model call. When set, the loop uses it instead of `call` and
+   * emits `token` steps as text arrives. See `openaiCompatibleStream`.
+   */
+  stream?: ModelStreamCall;
   /** The tools the agent may use, keyed by name. */
-  tools: Record<string, Tool>;
+  tools: ToolSet;
   /** The conversation so far (system + user messages). */
   messages: Message[];
   /** Safety cap on model round-trips. Default 10. */
@@ -109,7 +141,7 @@ export interface AgentConfig {
    * Called before each tool runs. Return `false` to pause the run for approval
    * (the loop yields a `paused` step with a serializable `resumeState`).
    */
-  approve?: (tool: string, args: any) => boolean;
+  approve?: (tool: string, args: unknown) => boolean;
   /**
    * Cancel the run. When aborted, the loop throws at the next checkpoint (before
    * a model call or a tool run) and forwards the signal to the model call.
@@ -118,7 +150,7 @@ export interface AgentConfig {
   signal?: AbortSignal;
 }
 
-function toSpecs(tools: Record<string, Tool>): ToolSpec[] {
+function toSpecs(tools: ToolSet): ToolSpec[] {
   return Object.entries(tools).map(([name, t]) => ({
     type: "function",
     function: { name, description: t.description, parameters: t.parameters },
@@ -126,14 +158,34 @@ function toSpecs(tools: Record<string, Tool>): ToolSpec[] {
 }
 
 async function runTool(
-  tool: Tool,
-  args: any,
-): Promise<{ result?: any; error?: string }> {
+  tool: Tool<never, unknown>,
+  args: unknown,
+): Promise<{ result?: unknown; error?: string }> {
   try {
-    return { result: await tool.run(args) };
+    // The model provides the arguments, so they're `unknown` here; the tool
+    // (or a Zod schema via `yieldagent/zod`) is responsible for validating them.
+    const run = tool.run as (args: unknown) => unknown | Promise<unknown>;
+    return { result: await run(args) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/**
+ * Drain a streaming model call: yield a `token` step for each text chunk and
+ * return the final assembled message so the loop can continue.
+ */
+async function* consumeStream(
+  source: AsyncIterable<StreamChunk>,
+  step: number,
+): AsyncGenerator<Step, Message, unknown> {
+  let final: Message | undefined;
+  for await (const chunk of source) {
+    if (chunk.type === "token") yield { type: "token", text: chunk.text, step };
+    else final = chunk.message;
+  }
+  if (!final) throw new Error("stream ended without a final message chunk");
+  return final;
 }
 
 /**
@@ -148,13 +200,16 @@ async function runTool(
 export async function* agent(
   cfg: AgentConfig,
 ): AsyncGenerator<Step, void, unknown> {
-  const { call, tools, maxSteps = 10, approve, signal } = cfg;
+  const { call, stream, tools, maxSteps = 10, approve, signal } = cfg;
+  if (!call && !stream) throw new Error("agent(): provide either `call` or `stream`");
   const messages: Message[] = [...cfg.messages];
   const specs = toSpecs(tools);
 
   for (let step = 0; step < maxSteps; step++) {
     signal?.throwIfAborted();
-    const reply = await call(messages, specs, { signal });
+    const reply = stream
+      ? yield* consumeStream(stream(messages, specs, { signal }), step)
+      : await call!(messages, specs, { signal });
     messages.push(reply);
 
     // Model answered without asking for a tool -> we're done.
@@ -247,10 +302,10 @@ export async function* resume(
   yield* agent({ ...cfg, messages });
 }
 
-function parseArgs(raw: string | undefined): any {
+function parseArgs(raw: string | undefined): unknown {
   if (!raw) return {};
   try {
-    return JSON.parse(raw);
+    return JSON.parse(raw) as unknown;
   } catch {
     return {};
   }
