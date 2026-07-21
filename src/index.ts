@@ -1,9 +1,9 @@
 /**
- * yieldagent — the smallest agent loop that's actually useful.
+ * yieldagent — a small agent loop with no dependencies.
  *
- * Zero dependencies. Works with any OpenAI-compatible chat endpoint.
- * The loop `yield`s every step (so you can inspect/test it) and can `yield`
- * control back to a human to pause before a tool runs, then resume later.
+ * The loop is an async generator: it yields every step so you can inspect and
+ * test it, and it can pause before a tool runs (see `approve`) so a human can
+ * sign off before the agent does anything you'd rather supervise.
  */
 
 /** A single tool the agent is allowed to call. */
@@ -132,7 +132,7 @@ export async function* agent(
     const reply = await call(messages, specs);
     messages.push(reply);
 
-    // No tool calls -> the model produced a final answer.
+    // Model answered without asking for a tool -> we're done.
     if (!reply.tool_calls || reply.tool_calls.length === 0) {
       yield { type: "final", text: reply.content, messages };
       return;
@@ -153,7 +153,7 @@ export async function* agent(
         continue;
       }
 
-      // INTERRUPT: hand control to the caller before anything runs.
+      // Let the caller stop us before the tool actually runs.
       if (approve && approve(name, args) === false) {
         yield {
           type: "paused",

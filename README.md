@@ -1,20 +1,25 @@
 # yieldagent
 
-**The smallest agent loop that's actually useful.** Zero dependencies. ~200 lines you can read in one sitting. With **human-in-the-loop pause/resume** built in — the thing every other tiny agent skips.
+A small agent loop you can actually read. No dependencies, works with any
+OpenAI-compatible API, and — unlike most minimal agent libraries — it lets you
+pause before a tool runs, get a human's approval, and resume later.
 
 ```bash
 npm install yieldagent
 ```
 
-- 🧠 **You own the loop.** No framework, no magic, no lock-in. Read the whole thing.
-- ⏸️ **Pause & resume.** Stop before any sensitive tool runs, get human approval, resume exactly where you left off — state is a plain, serializable object.
-- 🔍 **Inspectable & testable.** Every step is yielded as a plain object. Unit-test your agent with a scripted model — no API key, no network, no flakiness.
-- 🔌 **Any model.** Works with any OpenAI-compatible endpoint (OpenAI, Anthropic, Groq, Together, Ollama, OpenRouter…).
-- 📦 **Zero dependencies.** Nothing to audit, nothing to bloat your bundle.
+## Why
 
----
+I wanted an agent loop I could understand end to end instead of a framework I
+had to configure. The tiny ones I found were fine until I needed the agent to
+do something I didn't want it doing unsupervised — sending an email, spending
+money, deleting a file. None of them made "stop and ask a human first" easy,
+and the big frameworks made it a whole subsystem.
 
-## Quick start
+So this is the loop, kept deliberately small, with pause/resume as a first-class
+thing rather than an afterthought.
+
+## Basic use
 
 ```ts
 import { agent, type Tool } from "yieldagent";
@@ -23,7 +28,11 @@ import { openaiCompatible } from "yieldagent/openai";
 const tools: Record<string, Tool> = {
   getWeather: {
     description: "Get the current weather for a city",
-    parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+    parameters: {
+      type: "object",
+      properties: { city: { type: "string" } },
+      required: ["city"],
+    },
     run: async ({ city }) => ({ city, tempC: 31, sky: "clear" }),
   },
 };
@@ -35,121 +44,110 @@ for await (const step of agent({
   tools,
   messages: [{ role: "user", content: "What's the weather in Delhi?" }],
 })) {
-  if (step.type === "tool-start") console.log(`→ ${step.tool}`, step.args);
-  if (step.type === "final") console.log("🤖", step.text);
+  if (step.type === "tool-start") console.log("→", step.tool, step.args);
+  if (step.type === "final") console.log(step.text);
 }
 ```
 
-That's the whole thing. `agent()` is an async generator: it calls the model, runs any tools the model asks for, feeds the results back, and loops until the model gives a final answer.
+`agent()` is an async generator. It calls the model, runs whatever tools the
+model asks for, feeds the results back, and repeats until the model stops asking
+for tools. Every step is yielded, so nothing is hidden from you.
 
----
+## Pause and resume
 
-## The feature nobody else makes easy: pause & resume
-
-Real agents do risky things — send emails, spend money, delete files. You want a human in the loop **before** that happens, and you want to pause a run and continue it later (across a request, a queue, even a server restart).
-
-Pass `approve()`. Return `false` and the loop **pauses** and hands you a serializable `resumeState`:
+Pass an `approve` function. Return `false` for a given tool and the loop stops
+before running it, handing back a `resumeState` that's just a plain object:
 
 ```ts
 const cfg = {
   call,
-  tools, // includes a `sendEmail` tool
+  tools, // includes a sendEmail tool
   messages: [{ role: "user", content: "Email the Delhi weather to my boss" }],
-  approve: (tool) => tool !== "sendEmail", // pause before sending
+  approve: (tool) => tool !== "sendEmail",
 };
 
 let paused;
 for await (const step of agent(cfg)) {
-  if (step.type === "paused") {
-    console.log(`⏸ needs approval: ${step.tool}`, step.args);
-    paused = step.resumeState; // <- plain object. Save it to a DB, a queue, anywhere.
-  }
-  if (step.type === "final") console.log("🤖", step.text);
-}
-
-// ...later, after a human clicks "Approve" (even in a different process)...
-import { resume } from "yieldagent";
-for await (const step of resume(cfg, paused)) {
-  if (step.type === "final") console.log("🤖", step.text);
+  if (step.type === "paused") paused = step.resumeState;
+  if (step.type === "final") console.log(step.text);
 }
 ```
 
-Because `resumeState` is just data, you can serialize it, store it, and resume from anywhere.
-
----
-
-## Testable by design — no LLM required
-
-`agent()` takes *any* function shaped like `(messages, tools) => Promise<Message>`. In tests, pass a scripted one and assert on the steps. **Deterministic, instant, free.**
+`resumeState` is serializable, so you can write it to a database or a job queue,
+wait for a human to click approve (in another request, another process, after a
+restart — doesn't matter), then continue:
 
 ```ts
-import { agent } from "yieldagent";
+import { resume } from "yieldagent";
 
-const scripted = (() => {
-  let i = 0;
-  const replies = [
-    { role: "assistant", content: null, tool_calls: [{ id: "1", function: { name: "getWeather", arguments: '{"city":"Delhi"}' } }] },
-    { role: "assistant", content: "It's 31°C.", tool_calls: [] },
-  ];
-  return async () => replies[i++];
-})();
-
-const steps = [];
-for await (const s of agent({ call: scripted, tools, messages })) steps.push(s);
-
-expect(steps.map((s) => s.type)).toEqual(["tool-start", "tool-end", "final"]);
+for await (const step of resume(cfg, paused)) {
+  if (step.type === "final") console.log(step.text);
+}
 ```
 
----
+## Testing without an LLM
+
+`call` is just a function `(messages, tools) => Promise<Message>`. In tests, pass
+one that returns canned replies. No API key, no network, and the results are
+deterministic:
+
+```ts
+const replies = [
+  { role: "assistant", content: null, tool_calls: [{ id: "1", function: { name: "getWeather", arguments: '{"city":"Delhi"}' } }] },
+  { role: "assistant", content: "It's 31°C.", tool_calls: [] },
+];
+let i = 0;
+const call = async () => replies[i++];
+
+const steps = [];
+for await (const s of agent({ call, tools, messages })) steps.push(s);
+// assert on steps.map(s => s.type), the tool results, the final text, etc.
+```
+
+This is how the library tests itself — see [`test/agent.test.ts`](test/agent.test.ts).
 
 ## API
 
-### `agent(config)` → `AsyncGenerator<Step>`
+**`agent(config)`** returns an async generator of steps.
 
-| Config field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `call` | `(messages, tools) => Promise<Message>` | — | Your model call. See `yieldagent/openai`. |
-| `tools` | `Record<string, Tool>` | — | Tools the agent may use, keyed by name. |
-| `messages` | `Message[]` | — | The conversation so far. |
-| `maxSteps` | `number` | `10` | Safety cap on model round-trips. |
-| `approve` | `(tool, args) => boolean` | — | Return `false` to pause before a tool runs. |
+- `call` — your model function, `(messages, tools) => Promise<Message>`
+- `tools` — a map of name → `{ description, parameters, run }`
+- `messages` — the conversation so far
+- `maxSteps` — cap on model round-trips (default 10)
+- `approve` — optional `(tool, args) => boolean`; return `false` to pause
 
-### `resume(config, resumeState)` → `AsyncGenerator<Step>`
+**`resume(config, resumeState)`** runs the pending tool from a paused run, then
+continues the loop.
 
-Runs the pending tool call from a paused run, then continues the loop.
+**Step** is one of:
 
-### `Step` types
+- `tool-start` — `{ tool, args, step }`
+- `tool-end` — `{ tool, args, result?, error?, step }`
+- `paused` — `{ tool, args, resumeState }`
+- `final` — `{ text, messages }`
 
-- `{ type: "tool-start", tool, args, step }`
-- `{ type: "tool-end", tool, args, result?, error?, step }`
-- `{ type: "paused", reason, tool, args, resumeState }`
-- `{ type: "final", text, messages }`
-
-### Any OpenAI-compatible provider
+**Providers.** `openaiCompatible` talks to anything speaking the
+`/chat/completions` shape — OpenAI, Anthropic's compatible endpoint, Groq,
+Together, Ollama, OpenRouter:
 
 ```ts
 openaiCompatible({
   apiKey: "...",
   model: "gpt-4o-mini",
-  baseURL: "https://api.openai.com/v1", // or Groq, Together, Ollama, OpenRouter, ...
+  baseURL: "https://api.openai.com/v1", // point elsewhere as needed
 });
 ```
 
----
+Or skip it and write your own `call` — it's a dozen lines.
 
-## Why not just use the Vercel AI SDK / LangGraph?
+## When to use something else
 
-Use them! They're great. Reach for `yieldagent` when you want:
-
-- **To understand and own your agent loop** instead of configuring a framework.
-- **First-class pause/resume** with plain serializable state (no checkpointer setup).
-- **Zero dependencies** and a footprint you can read end-to-end.
-- **Trivially testable** agent logic with no mocking machinery.
-
-It's small on purpose. If you outgrow it, you'll understand exactly what to reach for next — because you can read every line of what you're leaving.
-
----
+If you need streaming UI helpers, a big tool ecosystem, multi-agent
+orchestration, or persistence adapters out of the box, use the
+[Vercel AI SDK](https://sdk.vercel.ai) or [LangGraph](https://langchain-ai.github.io/langgraphjs/).
+yieldagent is for when you'd rather own a loop you can read in a few minutes than
+adopt a framework. If you outgrow it, you'll know exactly what you're replacing.
 
 ## License
 
-MIT © Rahul Choudhary
+MIT
