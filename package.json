@@ -1,6 +1,6 @@
 {
   "name": "yieldagent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The smallest agent loop that's actually useful. ~120 lines, zero dependencies, with human-in-the-loop pause/resume built in. Works with any OpenAI-compatible endpoint.",
   "type": "module",
   "main": "./dist/index.js",
