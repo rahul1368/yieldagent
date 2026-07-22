@@ -35,13 +35,39 @@ and the big frameworks made it a whole subsystem.
 So this is the loop, kept deliberately small, with pause/resume as a first-class
 thing rather than an afterthought.
 
+## Use cases
+
+yieldagent fits best when an agent does real things and you want a human in the
+loop:
+
+- **Agents that take risky or irreversible actions** you don't want to run
+  unsupervised: sending email, making payments or refunds, deleting or editing
+  records, posting publicly, running shell commands. `approve()` gates them.
+- **Async approval workflows.** The agent prepares an action, pauses, and a
+  human approves later, in another request, a Slack button, or a dashboard, even
+  after a restart. `resumeState` is plain data you can store and resume.
+- **Coding and CLI agents** that propose a command and wait for your yes/no
+  before executing it.
+- **Local or private agents.** Point `baseURL` at Ollama or vLLM and keep
+  everything on-prem; the approval gate matters more when an agent can touch
+  your filesystem.
+- **Regulated workflows** (finance, healthcare, legal) that need human sign-off
+  and an auditable trail. Every step is a plain object you can log.
+- **Embedding a small agent in an existing app** without pulling in a framework
+  and its dependency tree.
+- **Testing agent logic in CI**, since the model call is just a function you can
+  script deterministically with no API key.
+
+If you need multi-agent orchestration, prebuilt streaming UI, or a large tool
+catalog out of the box, reach for the Vercel AI SDK or LangGraph instead.
+
 ## Basic use
 
 ```ts
-import { agent, type Tool } from "yieldagent";
+import { agent, type ToolSet } from "yieldagent";
 import { openaiCompatible } from "yieldagent/openai";
 
-const tools: Record<string, Tool> = {
+const tools: ToolSet = {
   getWeather: {
     description: "Get the current weather for a city",
     parameters: {
